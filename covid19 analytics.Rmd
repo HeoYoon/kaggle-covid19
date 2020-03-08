@@ -84,32 +84,115 @@ library(lubridate)
 * latitude: 위도
 * longitude: 경도
 
-### 3. time 데이터셋 정보
-* date: 일자
-* acc_test: 누적 검사 수 (진행 중인 검사 포함)
-* acc_negative: 누적 음성 결과 수
-* acc_confirmed: 누적 양성 결과 수 (확진)
-* acc_released: 누적 격리 해제 수
-* acc_deceased: 누적 사망 수
-* new_test: 신규 검사 수
-* new_negative: 신규 음성 결과 수
-* new_confirmed: 신규 양성 결과 수 (확진)
-* new_released: 신규 격리 해제 수
-* new_deceased: 사망 수
-
 
 ### Data Loading
 ```{r}
-patient <- read.csv("patient.csv")
-route <- read.csv("route.csv")
-time <- read.csv("time.csv")
+patient <- read.csv("patient.csv", na.strings = c("", "NA", " "))
+route <- read.csv("route.csv", na.strings = c("", "NA", " "))
 
 dim(patient)
 str(patient)
 
 dim(route)
 str(route)
-
-dim(time)
-str(time)
 ```
+
+### Missing value Check
+
+```{r}
+## Patient Data
+colSums(is.na(patient))
+
+patient %>%
+  select(-id) %>%
+  summarise_all(funs(sum(is.na(.)))) %>%
+  gather() %>%
+  filter(value > 0) %>%
+  ggplot(aes(key, value, fill = as.factor(key))) + 
+  geom_bar(stat = "identity") +
+  geom_label(aes(label = value)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+## Route Data
+colSums(is.na(route))
+
+
+```
+There is no null data in route & time, <br>
+but patient data have many null. 
+
+### Merge
+
+```{r}
+merge_data <- left_join(patient, route, "id")
+
+levels(merge_data$group)
+
+```
+
+### 
+
+```{r}
+merge_data %>%
+  select(group) %>%
+  filter(!is.na(group)) %>%
+  group_by(group) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(group, n , fill = group)) +
+  geom_bar(stat = "identity") +
+  geom_label(aes(label = n)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  coord_flip()
+```
+All factors are related to religion.
+
+```{r}
+## Re setting group 
+merge_data$religion <- ifelse(is.na(merge_data$group), "NA value", "Religion related")
+merge_data$religion <- as.factor(merge_data$religion)
+
+str(merge_data)
+```
+
+### EDA
+
+```{r}
+## Sex
+merge_data %>%
+  filter(!is.na(sex)) %>%
+  group_by(sex,religion) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(sex, n, fill = religion)) +
+  geom_bar(stat = "identity", position = position_dodge2(0.9)) +
+  geom_label(aes(label = n), position = position_dodge2(0.9)) + 
+  theme_bw() +
+  scale_fill_discrete(label = c("Religion related","NA Value"))
+
+## birth_year
+merge_data$age <- ifelse(is.na(merge_data$birth_year), NA ,2020 - merge_data$birth_year)
+merge_data %>%
+  filter(!is.na(birth_year)) %>%
+  ggplot(aes(religion,birth_year)) +
+  geom_boxplot() +
+  theme_bw()
+
+merge_data %>%
+  filter(!is.na(birth_year)) %>%
+  ggplot(aes(age, fill = religion)) +
+  geom_density(alpha = 0.5) +
+  theme_bw()
+
+
+
+```
+
+
+
+
+
+
+
+
